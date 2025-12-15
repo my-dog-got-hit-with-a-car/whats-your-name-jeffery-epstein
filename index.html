@@ -1,0 +1,923 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <title>web-os</title>
+  <style>
+    :root{
+      --ink:#111; --muted:#3a3a3a; --accent:#0ea5e9; --accent2:#0078D7;
+      --glass:#ffffffcc; --border:#b5b5b5; --bar:#f0f0f0;
+    }
+    *{box-sizing:border-box}
+    html,body{height:100%; margin:0; padding:0; font-family:'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;}
+    body{
+      color:var(--ink);
+      min-height:100vh; overflow:hidden;
+      background: repeating-conic-gradient(#e0e0e0 0% 25%, transparent 0% 50%) 50%/40px 40px;
+      position:relative;
+      user-select:none;
+    }
+
+    /* Desktop Icons */
+    .icon {
+      width: 80px;
+      text-align: center;
+      cursor: pointer;
+      position: absolute;
+    }
+    .icon img {
+      width: 64px; height: 64px;
+      display:block; margin:0 auto;
+      pointer-events: none;
+    }
+    .icon span {
+      display:block;
+      margin-top:4px;
+      font-size:12px;
+      background:rgba(255,255,255,0.4);
+      border-radius:4px;
+      padding:2px 4px;
+      pointer-events: none;
+    }
+    .icon.selected {
+      background:rgba(128,128,128,0.4);
+      border-radius:6px;
+      padding:4px 0;
+    }
+
+    /* Popup Window */
+    .popup {
+      position:absolute; top:100px; left:100px;
+      width:800px; height:500px;
+      background:var(--glass); border:1px solid var(--border); border-radius:6px;
+      box-shadow:0 12px 28px rgba(0,0,0,.35);
+      display:none; flex-direction:column; overflow:hidden;
+      z-index:999; resize:both;
+    }
+    .popup .titlebar{
+      background:var(--bar); padding:6px 10px; display:flex; align-items:center;
+      cursor:move; border-bottom:1px solid var(--border);
+    }
+    .popup iframe{ flex:1; border:0; background:#000; }
+
+    .winbtns{ margin-left:auto; display:flex; }
+    .winbtn { border:0; background:transparent; cursor:pointer; padding:0 10px; }
+    .winbtn:hover { background:var(--accent); color:#fff }
+    .winbtn.close:hover { background:#e81123; color:#fff }
+
+    /* Music Player */
+    #musicPlayer {
+      position: fixed;
+      bottom: 40px;
+      right: 20px;
+      width: 300px;
+      background: var(--glass);
+      border: 1px solid var(--border);
+      border-radius: 6px;
+      box-shadow: 0 4px 12px rgba(0,0,0,0.3);
+      display: none;
+      flex-direction: column;
+      z-index: 1200;
+    }
+    #musicPlayer .titlebar {
+      background: var(--bar);
+      padding: 6px 10px;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      cursor: move;
+      border-bottom: 1px solid var(--border);
+    }
+    #musicPlayer .titlebar button {
+      border: none;
+      background: transparent;
+      cursor: pointer;
+    }
+    #musicPlayer .content {
+      padding: 10px;
+    }
+
+    /* Status toast (non-blocking) */
+    #saveStatus {
+      position: fixed;
+      right: 20px;
+      bottom: 44px;
+      background: var(--bar);
+      border: 1px solid var(--border);
+      padding: 8px 10px;
+      border-radius: 6px;
+      box-shadow: 0 6px 18px rgba(0,0,0,0.2);
+      z-index: 2000;
+      display: none;
+      font-size: 13px;
+    }
+
+    /* Taskbar */
+    .taskbar {
+      position:fixed; bottom:0; left:0; right:0;
+      height:32px; background:var(--bar);
+      border-top:1px solid var(--border);
+      display:flex; justify-content:space-between; align-items:center;
+      padding:0 10px; font-size:13px; z-index:1000;
+    }
+    .taskbar-left { display:flex; gap:6px; align-items:center; }
+    .taskbar-left img, .taskbar-left button, .taskbar-left label {
+      height:24px; width:24px; cursor:pointer; background:none; border:none; padding:0;
+      display:inline-flex; align-items:center; justify-content:center;
+    }
+    .taskbar-left label { gap:6px; }
+    input[type="file"] { display:none; }
+  </style>
+</head>
+<body>
+
+  <!-- Desktop Icons -->
+  <div class="icon" style="top:50px; left:40px;" data-file="deltarune.html" data-title="Deltarune">
+    <img src="icons/deltarune.png" alt="Deltarune">
+    <span>Deltarune</span>
+  </div>
+  <div class="icon" style="top:150px; left:40px;" data-file="undertale.html" data-title="Undertale">
+    <img src="icons/undertale.png" alt="Undertale">
+    <span>Undertale</span>
+  </div>
+  <div class="icon" style="top:250px; left:40px;" data-file="Tanuki Sunset.html" data-title="Tanuki Sunset">
+    <img src="icons/tanuki.png" alt="Tanuki Sunset">
+    <span>Tanuki Sunset</span>
+  </div>
+  <div class="icon" style="top:350px; left:40px;" data-file="Hollow Knight.html" data-title="Hollow Knight">
+    <img src="icons/hollow.png" alt="Hollow Knight">
+    <span>Hollow Knight</span>
+  </div>
+  <div class="icon" style="top:460px; left:40px;" data-file="pizzatower.html" data-title="Pizza Tower">
+    <img src="icons/pizza.png" alt="Pizza Tower">
+    <span>Pizza Tower</span>
+  </div>
+  <div class="icon" style="top:560px; left:40px;" data-file="drift.html" data-title="Drift Hunters">
+    <img src="icons/drift.png" alt="Drift Hunters">
+    <span>Drift Hunters</span>
+  </div>
+   <div class="icon" style="top:160px; left:150px;" data-file="Sort the Court.html" data-title="Sort The Court">
+    <img src="icons/sort-the-court.png" alt="Sort The Court">
+    <span>Sort the Court</span>
+  </div>
+  <div class="icon" style="top:50px; left:150px;" data-file="Madness.html" data-title="Project Nexus">
+    <img src="icons/nexus.png" alt="Project Nexus">
+    <span>Project Nexus</span>
+  </div>
+  <div class="icon" style="top:260px; left:150px;" data-file="Minesweeper Mania.html" data-title="Minesweeper">
+    <img src="icons/mine.png" alt="Minesweeper">
+    <span>Minesweeper</span>
+  </div>
+  <div class="icon" style="top:350px; left:150px;" data-file="Cuphead.html" data-title="Cuphead">
+    <img src="icons/cup.png" alt="Cuphead">
+    <span>Cuphead</span>
+  </div>
+  <div class="icon" style="top:450px; left:150px;" data-file="clinfinitecraft.html" data-title="Infinite Craft">
+    <img src="icons/inf.png" alt="Infinite Craft">
+    <span>Infinite Craft</span>
+  </div>
+    <div class="icon" style="top:550px; left:150px;" data-file="Cookie Clicker.html" data-title="Cookie Clicker">
+    <img src="icons/cookie.png" alt="Cookie Clicker">
+    <span>Cookie Clicker</span>
+  </div>
+  <div class="icon" style="top:50px; left:260px;" data-file="clescaperoad.html" data-title="Escape Road">
+    <img src="icons/escape.png" alt="Escape Road">
+    <span>Escape Road</span>
+  </div>
+   <div class="icon" style="top:150px; left:260px;" data-file="War The Knights.html" data-title="War The Knights">
+    <img src="icons/knight.png" alt="War The Knights">
+    <span>War The Knights</span>
+  </div>
+  <div class="icon" style="top:250px; left:260px;" data-file="Retro Bowl College.html" data-title="Retro Bowl College">
+    <img src="icons/bowl.png" alt="Retro Bowl College">
+    <span>Retro Bowl College</span>
+  </div>
+  <div class="icon" style="top:350px; left:260px;" data-file="minecraft.html" data-title="Minecraft">
+    <img src="icons/minec.png" alt="Minecraft">
+    <span>Minecraft</span>
+  </div>
+  <div class="icon" style="top:450px; left:260px;" data-file="off.html" data-title="OFF">
+    <img src="icons/off.png" alt="OFF">
+    <span>OFF</span>
+  </div>
+  <div class="icon" style="top:550px; left:260px;" data-file="Snow Rider 3D.html" data-title="Snow Rider 3D">
+    <img src="icons/snow.png" alt="Snow Rider 3D">
+    <span>Snow Rider 3D</span>
+  </div>
+   <div class="icon" style="top:50px; left:360px;" data-file="sonic.html" data-title="Sonic 3 Complete">
+    <img src="icons/sonic.png" alt="Sonic 3 Complete">
+    <span>Sonic 3 Complete</span>
+  </div>
+    <div class="icon" style="top:150px; left:360px;" data-file="Idle Breakout.html" data-title="Idle Breakout">
+    <img src="icons/idle.png" alt="Idle Breakout">
+    <span>Idle Breakout</span>
+  </div>
+   <div class="icon" style="top:150px; left:460px;" data-file="Sonic Mania.html" data-title="Sonic Mania">
+    <img src="icons/sonicmania.png" alt="Sonic Mania">
+    <span>Sonic Mania</span>
+  </div>
+    <div class="icon" style="top:250px; left:360px;" data-file="Moto X3M Spooky.html" data-title="Moto X3M Spooky">
+    <img src="icons/motox3mspook.jpeg" alt="Moto X3M Spooky">
+    <span>Moto 3XM Spooky</span>
+  </div>
+  <div class="icon" style="top:350px; left:360px;" data-file="Gladihoppers.html" data-title="Gladihoppers">
+    <img src="icons/gladdi.png" alt="Gladihoppers">
+    <span>Gladihoppers</span>
+  </div>
+  <div class="icon" style="top:450px; left:360px;" data-file="Geometry Dash Lite.html" data-title="Geometry Dash Lite">
+    <img src="icons/geo.png" alt="Geometry Dash Lite">
+    <span>Geometry Dash Lite</span>
+  </div>
+  <div class="icon" style="top:550px; left:360px;" data-file="Minesweeper Plus.html" data-title="Minesweeper Plus">
+    <img src="icons/cutie.png" alt="Minesweeper Plus">
+    <span>Minesweeper Plus</span>
+  </div>
+  <div class="icon" style="top:50px; left:460px;" data-file="Drive Mad.html" data-title="Drive Mad">
+    <img src="icons/drivemad.png" alt="Drive Mad">
+    <span>Drive Mad</span>
+  </div>
+  <div class="icon" style="top:250px; left:460px;" data-file="Buster Jam.html" data-title="Buster Jam">
+    <img src="icons/buster.png" alt=" Buster Jam">
+    <span>Buster Jam</span>
+  </div>
+
+
+  <!-- Popup Window -->
+  <div id="popup" class="popup">
+    <div class="titlebar" id="popupTitle">
+      <span id="popupName">Window</span>
+      <div class="winbtns">
+        <button class="winbtn" onclick="toggleFullscreen()">▢</button>
+        <button class="winbtn close" onclick="closeGame()">✕</button>
+      </div>
+    </div>
+    <iframe id="gameFrame"></iframe>
+  </div>
+
+  <!-- Music Player -->
+  <div id="musicPlayer">
+    <div class="titlebar" id="musicTitleBar">
+      <span>Music Player</span>
+      <button onclick="closeMusicPlayer()">✕</button>
+    </div>
+    <div class="content">
+      <input type="file" id="mp3Upload" accept="audio/mp3">
+      <audio id="audioPlayer" controls style="width:100%; margin-top:8px;"></audio>
+    </div>
+  </div>
+
+  <!-- Status toast -->
+  <div id="saveStatus"></div>
+
+  <!-- Taskbar -->
+  <div class="taskbar">
+    <div class="taskbar-left">
+      <img src="icons/code.png" alt="Code Editor" onclick="openApp('CodeEditor.html','Code Editor')">
+      <img src="icons/paint.png" alt="Paint" onclick="openApp('Paint.html','Paint')">
+      <img src="icons/music.png" alt="Music Player" onclick="toggleMusicPlayer()">
+
+      <!-- Save / Load buttons (taskbar) -->
+      <button id="saveBtn" title="Save all game data (cookies + storage + indexedDB + caches)">💾</button>
+
+      <label title="Load all game data">
+        📂
+        <input id="loadFile" type="file" accept=".webosdata,.json">
+      </label>
+    </div>
+    <div style="display:flex; gap:10px; align-items:center;">
+      <div id="visitorCounter" title="Visitor count" style="font-size:13px; padding:4px 8px; background:var(--bar); border:1px solid var(--border); border-radius:6px;">
+        👥 <span id="visitorCount">...</span>
+      </div>
+      <div id="clock"></div>
+    </div>
+  </div>
+
+  <script>
+    /* -------------------------
+       Basic UI (unchanged behavior)
+       ------------------------- */
+    const popup = document.getElementById('popup');
+    const frame = document.getElementById('gameFrame');
+    const popupName = document.getElementById('popupName');
+    let isDraggingPopup = false, offsetX, offsetY;
+    let isFull = false, prev = {};
+
+    function openGame(file, title){
+      // games expected at ./games/<file>
+      frame.src = "./games/" + file;
+      popupName.textContent = title;
+      popup.style.display = "flex";
+      popup.style.zIndex = Date.now();
+    }
+    function openApp(file, title){
+      frame.src = "./" + file;
+      popupName.textContent = title;
+      popup.style.display = "flex";
+      popup.style.zIndex = Date.now();
+    }
+
+    function closeGame(){
+      popup.style.display = "none";
+      frame.src = "";
+      isFull=false;
+    }
+    function toggleFullscreen(){
+      if(!isFull){
+        prev = {left:popup.style.left, top:popup.style.top, width:popup.style.width, height:popup.style.height};
+        popup.style.left="0"; popup.style.top="0"; popup.style.width="100vw"; popup.style.height="100vh";
+        isFull=true;
+      } else {
+        popup.style.left=prev.left||"100px"; popup.style.top=prev.top||"100px";
+        popup.style.width=prev.width||"800px"; popup.style.height=prev.height||"500px";
+        isFull=false;
+      }
+    }
+
+    // Dragging popup titlebar
+    const bar = document.getElementById('popupTitle');
+    bar.addEventListener('mousedown', e=>{
+      if(isFull) return;
+      isDraggingPopup = true;
+      offsetX = e.clientX - popup.offsetLeft;
+      offsetY = e.clientY - popup.offsetTop;
+      e.preventDefault();
+    });
+    window.addEventListener('mousemove', e=>{
+      if(!isDraggingPopup) return;
+      popup.style.left = (e.clientX - offsetX) + "px";
+      popup.style.top = (e.clientY - offsetY) + "px";
+    });
+    window.addEventListener('mouseup', ()=> isDraggingPopup=false);
+
+    // Music player
+    const musicPlayer = document.getElementById('musicPlayer');
+    const musicBar = document.getElementById('musicTitleBar');
+    let isDraggingMusic = false, musicOffsetX, musicOffsetY;
+
+    function toggleMusicPlayer(){
+      musicPlayer.style.display = musicPlayer.style.display === 'flex' ? 'none' : 'flex';
+    }
+    function closeMusicPlayer(){
+      musicPlayer.style.display = 'none';
+    }
+    musicBar.addEventListener('mousedown', e => {
+      isDraggingMusic = true;
+      musicOffsetX = e.clientX - musicPlayer.offsetLeft;
+      musicOffsetY = e.clientY - musicPlayer.offsetTop;
+      e.preventDefault();
+    });
+    window.addEventListener('mousemove', e => {
+      if(!isDraggingMusic) return;
+      musicPlayer.style.left = (e.clientX - musicOffsetX) + 'px';
+      musicPlayer.style.top = (e.clientY - musicOffsetY) + 'px';
+      musicPlayer.style.position = 'absolute';
+    });
+    window.addEventListener('mouseup', ()=> isDraggingMusic = false);
+
+    // Icon drag + double click
+    document.querySelectorAll('.icon').forEach(icon=>{
+      let dragging=false, dx, dy;
+      icon.addEventListener('mousedown', e=>{
+        document.querySelectorAll('.icon').forEach(i=>i.classList.remove('selected'));
+        icon.classList.add('selected');
+        dragging=true;
+        dx = e.clientX - icon.offsetLeft;
+        dy = e.clientY - icon.offsetTop;
+        e.preventDefault();
+      });
+      window.addEventListener('mousemove', e=>{
+        if(!dragging) return;
+        icon.style.left = (e.clientX - dx)+"px";
+        icon.style.top = (e.clientY - dy)+"px";
+      });
+      window.addEventListener('mouseup', ()=> dragging=false);
+
+      icon.addEventListener('dblclick', ()=>{
+        const file = icon.dataset.file;
+        const title = icon.dataset.title;
+        if (file && title) openGame(file, title);
+      });
+    });
+    
+
+    // MP3 upload
+    const mp3Upload = document.getElementById('mp3Upload');
+    if (mp3Upload) {
+      mp3Upload.addEventListener('change', e => {
+        const file = e.target.files[0];
+        if(file){
+          const audio = document.getElementById('audioPlayer');
+          audio.src = URL.createObjectURL(file);
+          audio.play();
+        }
+      });
+    }
+
+    // Clock
+    function updateClock() {
+      const now = new Date();
+      const time = now.toLocaleTimeString([], {hour:'2-digit', minute:'2-digit'});
+      const date = now.toLocaleDateString();
+      document.getElementById('clock').textContent = `${date} ${time}`;
+    }
+    setInterval(updateClock,1000);
+    updateClock();
+
+    /* -------------------------
+       Utility UI: status toast
+       ------------------------- */
+    const saveStatus = document.getElementById('saveStatus');
+    let statusTimer = null;
+    function showStatus(msg, timeout=5000){
+      clearTimeout(statusTimer);
+      saveStatus.textContent = msg;
+      saveStatus.style.display = 'block';
+      if(timeout>0) statusTimer = setTimeout(()=> saveStatus.style.display='none', timeout);
+    }
+    function hideStatus(){ saveStatus.style.display='none'; clearTimeout(statusTimer); }
+
+    /* -------------------------
+       Serialization helpers
+       ------------------------- */
+    function safeStringify(obj){
+      try { return JSON.stringify(obj); }
+      catch(e) {
+        // fallback: strip circular refs (simple)
+        const seen = new WeakSet();
+        return JSON.stringify(obj, function(k,v){
+          if (typeof v === 'object' && v !== null) {
+            if (seen.has(v)) return "[Circular]";
+            seen.add(v);
+          }
+          return v;
+        });
+      }
+    }
+
+    function sanitizeArray(arr, maxItems=200, maxItemSize=100000){
+      if(!Array.isArray(arr)) return arr;
+      const slice = arr.slice(0, maxItems);
+      return slice.map(item => {
+        if (typeof item === 'string' && item.length > maxItemSize) return item.slice(0, maxItemSize) + '...';
+        if (typeof item === 'object') {
+          try { return JSON.parse(JSON.stringify(item)); }
+          catch { return "[Unserializable Object]"; }
+        }
+        return item;
+      });
+    }
+
+    async function readResponseBodySafe(response){
+      // returns either JSON/text or base64-limited string with type
+      const ct = (response.headers.get('content-type') || '').toLowerCase();
+      try {
+        if (ct.includes('application/json')) {
+          const json = await response.clone().json();
+          return {type:'json', body: json};
+        }
+        if (ct.includes('text') || ct.includes('javascript') || ct.includes('html')) {
+          const text = await response.clone().text();
+          const max = 20000;
+          return {type:'text', body: text.length>max ? text.slice(0,max)+'...':'', truncated: text.length>max};
+        }
+        // binary
+        const buffer = await response.clone().arrayBuffer();
+        const u8 = new Uint8Array(buffer);
+        // base64 encode with limit
+        const maxBytes = 50000;
+        let b64;
+        if (u8.length > maxBytes) {
+          const part = u8.slice(0, maxBytes);
+          b64 = btoa(String.fromCharCode(...part)) + '...';
+          return {type:'binary', body:b64, truncated:true};
+        } else {
+          b64 = btoa(String.fromCharCode(...u8));
+          return {type:'binary', body:b64, truncated:false};
+        }
+      } catch(e){
+        return {type:'error', body:'[unable to read response]'};
+      }
+    }
+
+    /* -------------------------
+       Main: Save all data (lock-in)
+       ------------------------- */
+    async function saveAllData(){
+      // non-blocking UI; show progress
+      showStatus('Collecting data...');
+      const result = {
+        meta: { savedAt: Date.now(), origin: location.origin, page: location.pathname },
+        cookies: null,
+        localStorage: {},
+        sessionStorage: {},
+        iframeLocalStorage: null, // optional snapshot of currently open game's localStorage (if accessible)
+        indexedDB: {},
+        caches: {}
+      };
+
+      try {
+        // cookies
+        try {
+          result.cookies = document.cookie || '';
+        } catch(e){
+          result.cookies = '';
+        }
+
+        // localStorage
+        try {
+          for (let i=0;i<localStorage.length;i++){
+            const k = localStorage.key(i);
+            result.localStorage[k] = localStorage.getItem(k);
+          }
+        } catch(e){ console.warn('localStorage read error', e); }
+
+        // sessionStorage
+        try {
+          for (let i=0;i<sessionStorage.length;i++){
+            const k = sessionStorage.key(i);
+            result.sessionStorage[k] = sessionStorage.getItem(k);
+          }
+        } catch(e){ console.warn('sessionStorage read error', e); }
+
+        // iframe snapshot of storage (if same-origin and currently loaded)
+        try {
+          if (frame.src && frame.contentWindow && frame.contentWindow.localStorage) {
+            const snap = {};
+            for (let i=0;i<frame.contentWindow.localStorage.length;i++){
+              const k = frame.contentWindow.localStorage.key(i);
+              snap[k] = frame.contentWindow.localStorage.getItem(k);
+            }
+            result.iframeLocalStorage = { url: frame.src, storage: snap };
+          }
+        } catch(e){ /* ignore if cross-origin */ }
+
+        // indexedDB (modern browsers)
+        if (indexedDB && indexedDB.databases) {
+          try {
+            const dbs = await indexedDB.databases();
+            for (const dbInfo of dbs) {
+              if (!dbInfo.name) continue;
+              result.indexedDB[dbInfo.name] = { version: dbInfo.version || 1, stores: {} };
+
+              // open DB and read stores
+              await new Promise((resolve, reject) => {
+                const openReq = indexedDB.open(dbInfo.name);
+                openReq.onerror = () => { console.warn('open indexeddb error', openReq.error); resolve(); };
+                openReq.onsuccess = () => {
+                  const db = openReq.result;
+                  const storeNames = Array.from(db.objectStoreNames);
+                  if (storeNames.length === 0) { db.close(); resolve(); return; }
+                  const tx = db.transaction(storeNames, 'readonly');
+                  let pending = storeNames.length;
+                  for (const storeName of storeNames) {
+                    const store = tx.objectStore(storeName);
+                    const getAll = store.getAll();
+                    getAll.onerror = () => { result.indexedDB[dbInfo.name].stores[storeName] = '[getAll error]'; pending--; if (!pending){ db.close(); resolve(); } };
+                    getAll.onsuccess = () => {
+                      // sanitize and limit size
+                      result.indexedDB[dbInfo.name].stores[storeName] = sanitizeArray(getAll.result, 200, 100000);
+                      pending--;
+                      if (!pending){ db.close(); resolve(); }
+                    };
+                  }
+                };
+              });
+            }
+          } catch(e){ console.warn('indexedDB collection failed', e); }
+        } else {
+          console.warn('indexedDB.databases() not supported in this browser — skipping indexedDB snapshot');
+        }
+
+        // caches
+        if ('caches' in window) {
+          try {
+            const cacheNames = await caches.keys();
+            for (const cacheName of cacheNames) {
+              try {
+                const cache = await caches.open(cacheName);
+                const requests = await cache.keys();
+                result.caches[cacheName] = [];
+                for (const req of requests) {
+                  try {
+                    const resp = await cache.match(req);
+                    if (!resp) continue;
+                    const body = await readResponseBodySafe(resp);
+                    result.caches[cacheName].push({
+                      url: req.url,
+                      contentType: resp.headers.get('content-type') || '',
+                      body
+                    });
+                  } catch(e){ console.warn('cache entry read fail', e); }
+                }
+              } catch(e){ console.warn('open cache fail', cacheName, e); }
+            }
+          } catch(e){ console.warn('caches read error', e); }
+        }
+
+        // Done collecting
+        showStatus('Preparing download...');
+        // stringify (safe)
+        const blob = new Blob([safeStringify(result)], {type: 'application/json'});
+        const url = URL.createObjectURL(blob);
+        const a = document.createElement('a');
+        a.href = url;
+        a.download = `webos-backup-${Date.now()}.webosdata`;
+        document.body.appendChild(a);
+        a.click();
+        a.remove();
+        URL.revokeObjectURL(url);
+        showStatus('Saved. Backup downloaded.', 3000);
+      } catch (err) {
+        console.error('save error', err);
+        showStatus('Save failed — see console', 6000);
+      }
+    }
+
+    /* -------------------------
+       Load saved file and restore
+       ------------------------- */
+    async function loadAllDataFromFile(file){
+      if (!file) return;
+      showStatus('Restoring backup...');
+      try {
+        const text = await file.text();
+        const data = JSON.parse(text);
+
+        // cookies: rewrite each cookie pair (attributes lost)
+        try {
+          if (data.cookies) {
+            // split cookie string by ';' and set each piece as cookie with path=/
+            const parts = data.cookies.split(';').map(p => p.trim()).filter(Boolean);
+            for (const part of parts) {
+              // If part includes '=' set it; else skip
+              if (part.includes('=')) {
+                // set cookie with path=/ so it's available site-wide
+                try { document.cookie = part + '; path=/'; } catch(e){ console.warn('cookie set failed', e); }
+              }
+            }
+          }
+        } catch(e){ console.warn('cookie restore error', e); }
+
+        // localStorage
+        try {
+          if (data.localStorage) {
+            for (const k of Object.keys(data.localStorage)) {
+              try { localStorage.setItem(k, data.localStorage[k]); } catch(e){ console.warn('localStorage set fail', k, e); }
+            }
+          }
+        } catch(e){ console.warn('localStorage restore error', e); }
+
+        // sessionStorage
+        try {
+          if (data.sessionStorage) {
+            for (const k of Object.keys(data.sessionStorage)) {
+              try { sessionStorage.setItem(k, data.sessionStorage[k]); } catch(e){ console.warn('sessionStorage set fail', k, e); }
+            }
+          }
+        } catch(e){ console.warn('sessionStorage restore error', e); }
+
+        // iframe localStorage snapshot (if any)
+        try {
+          if (data.iframeLocalStorage && frame.contentWindow && frame.contentWindow.localStorage) {
+            const obj = data.iframeLocalStorage.storage || {};
+            for (const k of Object.keys(obj)) {
+              try { frame.contentWindow.localStorage.setItem(k, obj[k]); } catch(e){ /* ignore */ }
+            }
+          }
+        } catch(e){ /* ignore cross-origin or failures */ }
+
+        // indexedDB restore
+        if (data.indexedDB) {
+          for (const dbName of Object.keys(data.indexedDB)) {
+            const dbObj = data.indexedDB[dbName];
+            const stores = dbObj.stores || {};
+            // First open current DB to get its version (if exists)
+            await new Promise((resolve) => {
+              // open without version to read existing version (works in many browsers)
+              let opened = false;
+              const r = indexedDB.open(dbName);
+              r.onsuccess = (ev) => {
+                const existingDb = r.result;
+                const existingVersion = existingDb.version || 1;
+                existingDb.close();
+                // If all stores exist, write directly; else bump version to create stores
+                const writeStores = async () => {
+                  try {
+                    const r2 = indexedDB.open(dbName);
+                    r2.onsuccess = () => {
+                      const db = r2.result;
+                      const tx = db.transaction(Object.keys(stores), 'readwrite');
+                      tx.oncomplete = () => { db.close(); resolve(); };
+                      tx.onerror = () => { console.warn('tx error writing stores', tx.error); db.close(); resolve(); };
+                      for (const storeName of Object.keys(stores)) {
+                        try {
+                          if (!db.objectStoreNames.contains(storeName)) {
+                            // cannot create store without version bump; skip (continue to version bump below)
+                            console.warn('store missing (will require upgrade):', storeName);
+                          } else {
+                            const os = tx.objectStore(storeName);
+                            // clear and add items
+                            os.clear().onsuccess = () => {
+                              const arr = stores[storeName] || [];
+                              for (const item of arr) {
+                                try { os.put(item); } catch(e){ /* ignore object structure issues */ }
+                              }
+                            };
+                          }
+                        } catch(e){ console.warn('write store error', e); }
+                      }
+                    };
+                    r2.onerror = () => { console.warn('open for write error', r2.error); resolve(); };
+                  } catch(e) {
+                    console.warn('writeStores error', e);
+                    resolve();
+                  }
+                };
+
+                // check missing stores
+                const missing = Object.keys(stores).some(s => !r.result.objectStoreNames.contains(s));
+                if (!missing) {
+                  // write directly
+                  writeStores();
+                } else {
+                  // need to bump version to create missing stores
+                  const newVer = existingVersion + 1;
+                  const r3 = indexedDB.open(dbName, newVer);
+                  r3.onupgradeneeded = (e) => {
+                    const db = e.target.result;
+                    for (const storeName of Object.keys(stores)) {
+                      if (!db.objectStoreNames.contains(storeName)) {
+                        try { db.createObjectStore(storeName, { keyPath:'id', autoIncrement:true }); }
+                        catch(e){ console.warn('createObjectStore fail', e); }
+                      }
+                    }
+                  };
+                  r3.onsuccess = () => {
+                    const db = r3.result;
+                    const tx = db.transaction(Object.keys(stores), 'readwrite');
+                    tx.oncomplete = () => { db.close(); resolve(); };
+                    tx.onerror = () => { console.warn('tx error after upgrade', tx.error); db.close(); resolve(); };
+                    for (const storeName of Object.keys(stores)) {
+                      try {
+                        const os = tx.objectStore(storeName);
+                        os.clear().onsuccess = () => {
+                          const arr = stores[storeName] || [];
+                          for (const item of arr) {
+                            try { os.put(item); } catch(e){ /* ignore */ }
+                          }
+                        };
+                      } catch(e){ console.warn('put after upgrade failed', e); }
+                    }
+                  };
+                  r3.onerror = () => { console.warn('upgrade open failed', r3.error); resolve(); };
+                }
+              };
+              r.onerror = () => {
+                // DB might not exist; create it with stores
+                const rNew = indexedDB.open(dbName, 1);
+                rNew.onupgradeneeded = (e) => {
+                  const db = e.target.result;
+                  for (const storeName of Object.keys(stores)) {
+                    if (!db.objectStoreNames.contains(storeName)) {
+                      try { db.createObjectStore(storeName, { keyPath:'id', autoIncrement:true }); } catch(e) { /* ignore */ }
+                    }
+                  }
+                };
+                rNew.onsuccess = () => {
+                  const db = rNew.result;
+                  const tx = db.transaction(Object.keys(stores), 'readwrite');
+                  tx.oncomplete = () => { db.close(); resolve(); };
+                  tx.onerror = () => { db.close(); resolve(); };
+                  for (const storeName of Object.keys(stores)) {
+                    try {
+                      const os = tx.objectStore(storeName);
+                      os.clear().onsuccess = () => {
+                        const arr = stores[storeName] || [];
+                        for (const item of arr) {
+                          try { os.put(item); } catch(e){ /* ignore */ }
+                        }
+                      };
+                    } catch(e){ /* ignore */ }
+                  }
+                };
+                rNew.onerror = () => { resolve(); };
+              };
+            });
+          } // end for each dbName
+        } // end indexedDB
+
+        // caches restore
+        if (data.caches && 'caches' in window) {
+          for (const cacheName of Object.keys(data.caches)) {
+            try {
+              const cache = await caches.open(cacheName);
+              // clear existing
+              const existingKeys = await cache.keys();
+              await Promise.all(existingKeys.map(k=>cache.delete(k)));
+              // put entries
+              for (const entry of data.caches[cacheName]) {
+                try {
+                  const content = entry.body || {};
+                  let response;
+                  if (entry.body && entry.body.type === 'json') {
+                    response = new Response(JSON.stringify(entry.body.body), { headers: {'content-type': entry.contentType || 'application/json'}});
+                  } else if (entry.body && entry.body.type === 'text') {
+                    response = new Response(entry.body.body, { headers: {'content-type': entry.contentType || 'text/plain'}});
+                  } else if (entry.body && entry.body.type === 'binary') {
+                    // base64 -> Uint8Array
+                    try {
+                      const b64 = entry.body.body.replace(/\.\.\.$/,''); // strip possible trailing ellipsis
+                      const binStr = atob(b64);
+                      const len = binStr.length;
+                      const bytes = new Uint8Array(len);
+                      for (let i=0;i<len;i++) bytes[i]=binStr.charCodeAt(i);
+                      response = new Response(bytes.buffer, { headers: {'content-type': entry.contentType || 'application/octet-stream'}});
+                    } catch(e){ response = new Response('', { headers: {'content-type': entry.contentType || 'application/octet-stream'}}); }
+                  } else {
+                    // unknown; store placeholder
+                    response = new Response('', { headers: {'content-type': entry.contentType || 'application/octet-stream'}});
+                  }
+                  await cache.put(entry.url, response);
+                } catch(e){ console.warn('cache put failed', e); }
+              }
+            } catch(e){ console.warn('cache restore error', cacheName, e); }
+          }
+        }
+
+        // final: reload so games pick up restored storage/cookies
+        showStatus('Restore complete. Reloading...', 2000);
+        setTimeout(()=> location.reload(), 900);
+      } catch(e){
+        console.error('restore failed', e);
+        showStatus('Restore failed — see console', 6000);
+      }
+    }
+
+    /* -------------------------
+       Wire buttons
+       ------------------------- */
+    document.getElementById('saveBtn').addEventListener('click', () => {
+      // run save - non-blocking
+      saveAllData();
+    });
+
+    document.getElementById('loadFile').addEventListener('change', (ev) => {
+      const f = ev.target.files && ev.target.files[0];
+      if (!f) return;
+      // ask user to confirm (optional)
+      const proceed = confirm('Loading will overwrite current cookies/storage and then reload the page. Continue?');
+      if (!proceed) return;
+      loadAllDataFromFile(f);
+    });
+
+    /* -------------------------
+       Visitor counter (bottom bar)
+       - attempts to use countapi.xyz to maintain a global shared counter
+       - falls back to per-browser localStorage count if network/API fails
+       ------------------------- */
+    (function(){
+      const el = document.getElementById('visitorCount');
+      if(!el) return;
+      // friendly namespace based on hostname to reduce collisions across different hosts
+      const ns = 'webos_' + (location.hostname || 'local').replace(/[^a-z0-9_-]/gi,'_').slice(0,60);
+      const key = 'visits';
+
+      async function incrGlobal() {
+        try {
+          const resp = await fetch('https://api.countapi.xyz/hit/' + encodeURIComponent(ns) + '/' + encodeURIComponent(key));
+          if (!resp.ok) throw new Error('countapi responded ' + resp.status);
+          const data = await resp.json();
+          if (data && typeof data.value !== 'undefined') {
+            el.textContent = data.value;
+            return;
+          }
+        } catch (e) {
+          console.warn('CountAPI unavailable, falling back to local counter', e);
+        }
+        // fallback:
+        try {
+          const localKey = 'webos_local_visits_' + (location.hostname || 'local');
+          let v = parseInt(localStorage.getItem(localKey) || '0', 10);
+          v = isNaN(v) ? 1 : v + 1;
+          localStorage.setItem(localKey, v);
+          el.textContent = v;
+        } catch (ee) {
+          // final fallback: show a dash
+          el.textContent = '-';
+        }
+      }
+
+      // run increment/display (do not block UI)
+      incrGlobal();
+    })();
+
+    /* -------------------------
+       Small safety: avoid blocking main UI
+       ------------------------- */
+    window.addEventListener('error', (e)=> {
+      console.error('Uncaught error', e);
+    });
+  </script>
+</body>
+</html>
